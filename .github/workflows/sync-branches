@@ -22,6 +22,9 @@ on:
       to_branch:
         required: true
         type: string
+    secrets:
+      dapr_bot_token:
+        required: true
 
 jobs:
   sync-branches:
@@ -43,7 +46,7 @@ jobs:
         id: pull
         uses: tretuna/sync-branches@main
         with:
-          GITHUB_TOKEN: ${{ secrets.DAPR_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.dapr_bot_token }}  
           FROM_BRANCH: ${{ env.FROM_BRANCH }}
           TO_BRANCH: ${{ inputs.to_branch }}
           CONTENT_COMPARISON: true
