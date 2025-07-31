@@ -1,0 +1,52 @@
+# ------------------------------------------------------------
+# Copyright 2025 The Dapr Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------
+
+name: Sync release commits between branch
+
+on:
+  workflow_call:
+    inputs:
+      from_branch:
+        required: true
+        type: string
+      to_branch:
+        required: true
+        type: string
+    secrets:
+      dapr_bot_token:
+        required: true
+
+jobs:
+  sync-branches:
+    runs-on: ubuntu-latest
+    name: Syncing branches
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Setting Release branch 
+        run: echo "FROM_BRANCH=${{ inputs.from_branch }}" >> $GITHUB_ENV
+
+      - name: Open Sync PR
+        id: pull
+        uses: tretuna/sync-branches@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.dapr_bot_token }}  
+          FROM_BRANCH: ${{ env.FROM_BRANCH }}
+          TO_BRANCH: ${{ inputs.to_branch }}
+          CONTENT_COMPARISON: true
