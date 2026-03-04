@@ -55,24 +55,3 @@ jobs:
     secrets:
       dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
 ```
-
-### Sync branches ([`sync-branches.yaml`](.github/workflows/sync-branches.yaml))
-
-Opens a PR to sync commits from one branch to another. Intended for syncing release branches back to `master`.
-
-```yaml
-# .github/workflows/sync-release-branch.yaml
-on:
-  push:
-    branches:
-      - release-*
-
-jobs:
-  sync-branches:
-    uses: dapr/.github/.github/workflows/sync-branches.yaml@main
-    with:
-      from_branch: ${{ github.ref_name }}
-      to_branch: master
-    secrets:
-      dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
-```
