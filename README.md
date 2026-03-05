@@ -26,13 +26,18 @@ jobs:
 
 ### Prune stale ([`prune-stale.yaml`](.github/workflows/prune-stale.yaml))
 
-Marks issues and PRs as stale after 90 days of inactivity and closes them after a further 7 days.
+Marks issues and PRs as stale after 90 days of inactivity and closes them after a further 7 days. The stale and close thresholds are configurable via inputs.
 
 ```yaml
 # .github/workflows/dapr-bot-schedule.yml
 jobs:
   prune_stale:
     uses: dapr/.github/.github/workflows/prune-stale.yaml@main
+    with:
+      days-before-pr-stale: 30      # default: 90
+      days-before-issue-stale: 30   # default: 90
+      days-before-pr-close: 7       # default: 7
+      days-before-issue-close: 7    # default: 7
     secrets:
       dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
 ```
