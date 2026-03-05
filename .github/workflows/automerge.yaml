@@ -22,8 +22,8 @@ name: Automerge and autoupdate PRs
 on:
   workflow_call:
     inputs:
-      maintainers:
-        description: 'Comma-separated list of maintainer GitHub usernames who can approve automerge'
+      maintainer-teams:
+        description: 'Comma-separated list of GitHub team slugs whose members can approve automerge'
         required: true
         type: string
     secrets:
@@ -50,6 +50,6 @@ jobs:
         run: pip install PyGithub
       - name: Automerge and autoupdate
         env:
-          MAINTAINERS: ${{ inputs.maintainers }}
+          MAINTAINER_TEAMS: ${{ inputs.maintainer-teams }}
           GITHUB_TOKEN: ${{ secrets.dapr_bot_token }}
         run: python dapr-github/.github/scripts/automerge.py
