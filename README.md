@@ -19,7 +19,7 @@ jobs:
   automerge:
     uses: dapr/.github/.github/workflows/automerge.yaml@main
     with:
-      maintainers: maintainer1,maintainer2,maintainer3
+      maintainer-teams: maintainers,co-maintainers
     secrets:
       dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
 ```
@@ -30,6 +30,11 @@ Marks issues and PRs as stale after 90 days of inactivity and closes them after 
 
 ```yaml
 # .github/workflows/dapr-bot-schedule.yml
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
 jobs:
   prune_stale:
     uses: dapr/.github/.github/workflows/prune-stale.yaml@main

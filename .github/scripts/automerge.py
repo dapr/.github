@@ -20,7 +20,11 @@ from github import Github
 
 g = Github(os.getenv("GITHUB_TOKEN"))
 repo = g.get_repo(os.getenv("GITHUB_REPOSITORY"))
-maintainers = [m.strip() for m in os.getenv("MAINTAINERS").split(',')]
+org = g.get_organization(repo.owner.login)
+maintainers = set()
+for team_slug in os.getenv("MAINTAINER_TEAMS").split(','):
+    for member in org.get_team_by_slug(team_slug.strip()).get_members():
+        maintainers.add(member.login)
 
 def fetch_pulls(mergeable_state, labels = {'automerge'}):
     return [pr for pr in repo.get_pulls(state='open', sort='created') \
