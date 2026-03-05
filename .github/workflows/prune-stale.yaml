@@ -12,14 +12,31 @@
 #
 
 # Reusable workflow for pruning stale issues and PRs.
-# Issues and PRs with no activity for 90 days are marked stale, and closed
-# after a further 7 days unless labelled pinned, good first issue, help wanted,
-# or triaged/resolved.
+# By default, issues and PRs with no activity for 90 days are marked stale, and
+# closed after a further 7 days unless labelled pinned, good first issue, help
+# wanted, or triaged/resolved. All thresholds are configurable via inputs.
 
 name: Prune stale issues and PRs
 
 on:
   workflow_call:
+    inputs:
+      days-before-pr-stale:
+        type: number
+        default: 90
+        description: Days of inactivity before a PR is marked stale
+      days-before-issue-stale:
+        type: number
+        default: 90
+        description: Days of inactivity before an issue is marked stale
+      days-before-pr-close:
+        type: number
+        default: 7
+        description: Days after stale label before a PR is closed
+      days-before-issue-close:
+        type: number
+        default: 7
+        description: Days after stale label before an issue is closed
     secrets:
       dapr_bot_token:
         required: true
@@ -39,29 +56,33 @@ jobs:
         uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.dapr_bot_token }}
-          days-before-pr-stale: 90
-          days-before-pr-close: 7
-          days-before-issue-stale: 90
-          days-before-issue-close: 7
+          days-before-pr-stale: ${{ inputs.days-before-pr-stale }}
+          days-before-pr-close: ${{ inputs.days-before-pr-close }}
+          days-before-issue-stale: ${{ inputs.days-before-issue-stale }}
+          days-before-issue-close: ${{ inputs.days-before-issue-close }}
           stale-issue-message: >
             This issue has been automatically marked as stale because it has not had activity in the
-            last 90 days. It will be closed in the next 7 days unless it is tagged
+            last ${{ inputs.days-before-issue-stale }} days. It will be closed in the next
+            ${{ inputs.days-before-issue-close }} days unless it is tagged
             (pinned, good first issue, help wanted or triaged/resolved) or other activity
             occurs. Thank you for your contributions.
           close-issue-message: >
-            This issue has been automatically closed because it has not had activity in the
-            last 97 days. If this issue is still valid, please ping a maintainer and ask them
-            to label it as pinned, good first issue, help wanted or triaged/resolved.
+            This issue has been automatically closed because it was marked stale with no
+            further activity for ${{ inputs.days-before-issue-close }} days. If this issue
+            is still valid, please ping a maintainer and ask them to label it as pinned,
+            good first issue, help wanted or triaged/resolved.
             Thank you for your contributions.
           stale-pr-message: >
             This pull request has been automatically marked as stale because it has not had
-            activity in the last 90 days. It will be closed in 7 days if no further activity
+            activity in the last ${{ inputs.days-before-pr-stale }} days. It will be closed in
+            ${{ inputs.days-before-pr-close }} days if no further activity
             occurs. Please feel free to give a status update now, ping for review, or re-open
             when it's ready. Thank you for your contributions!
           close-pr-message: >
-            This pull request has been automatically closed because it has not had
-            activity in the last 97 days. Please feel free to give a status update now,
-            ping for review, or re-open when it's ready. Thank you for your contributions!
+            This pull request has been automatically closed because it was marked stale with
+            no further activity for ${{ inputs.days-before-pr-close }} days. Please feel free
+            to give a status update now, ping for review, or re-open when it's ready.
+            Thank you for your contributions!
           stale-issue-label: 'stale'
           exempt-issue-labels: 'pinned,good first issue,help wanted,triaged/resolved'
           stale-pr-label: 'stale'
