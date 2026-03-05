@@ -1,0 +1,55 @@
+#
+# Copyright 2026 The Dapr Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Reusable workflow for automerging and autoupdating PRs.
+# PRs labelled "automerge" that have been approved by a maintainer and are in
+# a clean state will be squash-merged (one per run).
+# PRs labelled "automerge" or "autoupdate" that are behind the base branch
+# will have their branch updated.
+
+name: Automerge and autoupdate PRs
+
+on:
+  workflow_call:
+    inputs:
+      maintainers:
+        description: 'Comma-separated list of maintainer GitHub usernames who can approve automerge'
+        required: true
+        type: string
+    secrets:
+      dapr_bot_token:
+        required: true
+
+permissions: {}
+
+jobs:
+  automerge:
+    if: github.repository_owner == 'dapr'
+    name: Automerge and update PRs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout dapr/.github
+        uses: actions/checkout@v4
+        with:
+          repository: dapr/.github
+          path: dapr-github
+      - name: Install dependencies
+        run: pip install PyGithub
+      - name: Automerge and autoupdate
+        env:
+          MAINTAINERS: ${{ inputs.maintainers }}
+          GITHUB_TOKEN: ${{ secrets.dapr_bot_token }}
+        run: python dapr-github/.github/scripts/automerge.py
