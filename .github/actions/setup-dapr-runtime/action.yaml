@@ -1,0 +1,56 @@
+#
+# Copyright 2026 The Dapr Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+name: Setup Dapr Runtime
+description: >
+  Initialises the Dapr runtime via "dapr init". Requires the Dapr CLI to be
+  installed first (use the setup-dapr-cli action). Defaults to the highest
+  semver release (stable releases sort above pre-releases of the same version).
+
+inputs:
+  version:
+    description: >
+      Dapr runtime version to install (e.g. "1.14.0"). Omit to use the latest
+      stable release (highest semver, not necessarily the most recently
+      published).
+    required: false
+    default: ''
+
+outputs:
+  version:
+    description: The Dapr runtime version that was installed.
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Determine Dapr runtime version
+      id: version
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ -z "$VERSION" ]; then
+          VERSIONS=$(curl -sf "https://api.github.com/repos/dapr/dapr/releases?per_page=100" \
+            | jq -r '.[].tag_name' \
+            | sed 's/^v//')
+          VERSION=$(echo "$VERSIONS" \
+            | sed '/-/! s/$/_/' \
+            | sort -rV \
+            | sed 's/_$//' \
+            | head -1)
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Init Dapr runtime
+      shell: bash
+      run: dapr uninstall --all && dapr init --runtime-version ${{ steps.version.outputs.version }}
