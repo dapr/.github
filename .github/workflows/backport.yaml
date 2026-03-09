@@ -42,3 +42,21 @@ jobs:
       - uses: tibdex/backport@9565281eda0731b1d20c4025c43339fb0a23812e
         with:
           github_token: ${{ secrets.dapr_bot_token }}
+
+  delete-branch:
+    name: Delete backport branch
+    runs-on: ubuntu-latest
+    if: >
+      github.event.action == 'closed'
+      && startsWith(github.event.pull_request.head.ref, 'backport-')
+    steps:
+      - name: Delete branch
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          github-token: ${{ secrets.dapr_bot_token }}
+          script: |
+            await github.rest.git.deleteRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `heads/${context.payload.pull_request.head.ref}`,
+            })
