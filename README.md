@@ -47,6 +47,38 @@ jobs:
       dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
 ```
 
+### Setup Dapr CLI ([`setup-dapr-cli`](.github/actions/setup-dapr-cli/action.yaml))
+
+Installs the Dapr CLI. Defaults to the highest semver release — stable releases are preferred over pre-releases of the same version.
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dapr/.github/.github/actions/setup-dapr-cli@main
+        # with:
+        #   version: '1.14.0'   # omit to use latest stable
+```
+
+### Setup Dapr Runtime ([`setup-dapr-runtime`](.github/actions/setup-dapr-runtime/action.yaml))
+
+Initialises the Dapr runtime via `dapr init`. Requires the Dapr CLI to be installed first (use `setup-dapr-cli`). Defaults to the highest semver release.
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dapr/.github/.github/actions/setup-dapr-cli@main
+
+      - uses: dapr/.github/.github/actions/setup-dapr-runtime@main
+        # with:
+        #   version: '1.14.0'   # omit to use latest stable
+
+      - run: dapr --version
+```
+
 ### Backport ([`backport.yaml`](.github/workflows/backport.yaml))
 
 Backports merged PRs to release branches when a `backport/release-*` label is applied.
