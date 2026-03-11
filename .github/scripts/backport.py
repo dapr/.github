@@ -111,7 +111,7 @@ for base_branch in target_branches:
 
     # Create the backport branch and cherry-pick.
     run(['git', 'checkout', '-b', backport_branch, f'origin/{base_branch}'])
-    cherry = run(['git', 'cherry-pick', '-x', '-m', '1', merge_commit_sha], check=False)
+    cherry = run(['git', 'cherry-pick', '-s', '-x', '-m', '1', merge_commit_sha], check=False)
 
     if cherry.returncode != 0:
         run(['git', 'cherry-pick', '--abort'], check=False)
