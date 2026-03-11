@@ -42,6 +42,20 @@ jobs:
       - uses: tibdex/backport@9565281eda0731b1d20c4025c43339fb0a23812e
         with:
           github_token: ${{ secrets.dapr_bot_token }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Add DCO signoff to backport commits
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          for BRANCH in $(git ls-remote --heads origin | grep "backport-${PR_NUMBER}-to-" | awk '{print $2}' | sed 's|refs/heads/||'); do
+            git fetch origin "${BRANCH}"
+            git checkout "${BRANCH}"
+            AUTHOR_NAME=$(git log -1 --format='%an')
+            AUTHOR_EMAIL=$(git log -1 --format='%ae')
+            git -c user.name="${AUTHOR_NAME}" -c user.email="${AUTHOR_EMAIL}" commit --amend --signoff --no-edit
+            git push --force-with-lease origin "${BRANCH}"
+          done
 
   delete-branch:
     name: Delete backport branch
