@@ -16,13 +16,24 @@ description: >
   Initialises the Dapr runtime via "dapr init". Requires the Dapr CLI to be
   installed first (use the setup-dapr-cli action). Defaults to the highest
   semver release (stable releases sort above pre-releases of the same version).
+  If a commit is provided, the daprd binary is replaced with one built from
+  that ref after init completes.
 
 inputs:
   version:
     description: >
-      Dapr runtime version to install (e.g. "1.14.0"). Omit to use the latest
-      stable release (highest semver, not necessarily the most recently
-      published).
+      Dapr runtime version passed to "dapr init" (e.g. "1.14.0"). Omit to use
+      the latest stable release (highest semver, not necessarily the most
+      recently published). Always used, even when commit is set.
+    required: false
+    default: ''
+  commit:
+    description: >
+      A git commit SHA or ref in the dapr/dapr repository. When provided,
+      "dapr init" runs first (using the version input to set up the runtime
+      environment), then the daprd binary is replaced with one built from
+      source at this ref. Go will be installed automatically if not already
+      available.
     required: false
     default: ''
 
@@ -54,3 +65,32 @@ runs:
     - name: Init Dapr runtime
       shell: bash
       run: dapr uninstall --all && dapr init --runtime-version ${{ steps.version.outputs.version }}
+
+    - name: Check if Go is available
+      id: check-go
+      if: inputs.commit != ''
+      shell: bash
+      run: |
+        if command -v go &>/dev/null; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up Go
+      if: inputs.commit != '' && steps.check-go.outputs.available == 'false'
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+
+    - name: Build daprd from commit
+      if: inputs.commit != ''
+      shell: bash
+      run: |
+        TMPDIR=$(mktemp -d)
+        git clone --filter=blob:none https://github.com/dapr/dapr.git "$TMPDIR/dapr"
+        cd "$TMPDIR/dapr"
+        git checkout "${{ inputs.commit }}"
+        GOOS=linux GOARCH=amd64 make
+        mkdir -p "$HOME/.dapr/bin/"
+        cp dist/linux_amd64/release/daprd "$HOME/.dapr/bin/daprd"
