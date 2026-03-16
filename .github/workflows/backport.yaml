@@ -19,6 +19,32 @@ name: Backport
 
 on:
   workflow_call:
+    inputs:
+      label-pattern:
+        description: 'Python regex to match backport labels. Must include a named group (?P<base>...) for the target branch.'
+        required: false
+        type: string
+        default: '^backport (?P<base>[^ ]+)$'
+      head-template:
+        description: 'Template for the backport branch name. Available variables: {base}, {number}.'
+        required: false
+        type: string
+        default: 'backport-{number}-to-{base}'
+      title-template:
+        description: 'Template for the backport PR title. Available variables: {base}, {number}, {title}.'
+        required: false
+        type: string
+        default: '[Backport {base}] {title}'
+      body-template:
+        description: 'Template for the backport PR body. Available variables: {base}, {number}, {title}, {body}, {merge_commit_sha}.'
+        required: false
+        type: string
+        default: 'Backport {merge_commit_sha} from #{number}.'
+      labels-template:
+        description: 'Template that evaluates to a JSON array of labels to add to the backport PR. Available variables: {base}, {labels} (JSON array of original PR labels excluding backport labels).'
+        required: false
+        type: string
+        default: '[]'
     secrets:
       dapr_bot_token:
         required: true
@@ -39,9 +65,30 @@ jobs:
         )
       )
     steps:
-      - uses: tibdex/backport@9565281eda0731b1d20c4025c43339fb0a23812e
+      - uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.dapr_bot_token }}
+          token: ${{ secrets.dapr_bot_token }}
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: dapr/.github
+          path: dapr-github
+          token: ${{ secrets.dapr_bot_token }}
+      - name: Configure git
+        run: |
+          git config user.name "dapr-bot"
+          git config user.email "dapr-bot@users.noreply.github.com"
+      - name: Install dependencies
+        run: pip install PyGithub
+      - name: Backport
+        env:
+          GITHUB_TOKEN: ${{ secrets.dapr_bot_token }}
+          BACKPORT_LABEL_PATTERN: ${{ inputs.label-pattern }}
+          BACKPORT_HEAD_TEMPLATE: ${{ inputs.head-template }}
+          BACKPORT_TITLE_TEMPLATE: ${{ inputs.title-template }}
+          BACKPORT_BODY_TEMPLATE: ${{ inputs.body-template }}
+          BACKPORT_LABELS_TEMPLATE: ${{ inputs.labels-template }}
+        run: python dapr-github/.github/scripts/backport.py
 
   delete-branch:
     name: Delete backport branch
