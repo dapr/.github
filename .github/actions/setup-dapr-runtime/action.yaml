@@ -36,6 +36,11 @@ inputs:
       available.
     required: false
     default: ''
+  github-token:
+    description: >
+      GitHub token used to authenticate API requests when resolving the
+      latest release version. Avoids unauthenticated rate limits (60 req/hr).
+    required: true
 
 outputs:
   version:
@@ -48,10 +53,13 @@ runs:
     - name: Determine Dapr runtime version
       id: version
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
         VERSION="${{ inputs.version }}"
         if [ -z "$VERSION" ]; then
-          VERSIONS=$(curl -sf "https://api.github.com/repos/dapr/dapr/releases?per_page=100" \
+          VERSIONS=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/dapr/dapr/releases?per_page=100" \
             | jq -r '.[].tag_name' \
             | sed 's/^v//')
           VERSION=$(echo "$VERSIONS" \
