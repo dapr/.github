@@ -24,22 +24,39 @@ inputs:
       published).
     required: false
     default: ''
+  commit:
+    description: >
+      A git commit SHA or ref in the dapr/cli repository. When provided,
+      the CLI is built from source at that ref and installed, overriding
+      the `version` input. Go will be installed automatically if not already
+      available.
+    required: false
+    default: ''
+  github-token:
+    description: >
+      GitHub token used to authenticate API requests when resolving the
+      latest release version. Avoids unauthenticated rate limits (60 req/hr).
+    required: true
 
 outputs:
   version:
     description: The Dapr CLI version that was installed.
-    value: ${{ steps.version.outputs.version }}
+    value: ${{ inputs.commit != '' && inputs.commit || steps.resolve-version.outputs.version }}
 
 runs:
   using: composite
   steps:
     - name: Determine Dapr CLI version
-      id: version
+      id: resolve-version
+      if: inputs.commit == ''
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
         VERSION="${{ inputs.version }}"
         if [ -z "$VERSION" ]; then
-          VERSIONS=$(curl -sf "https://api.github.com/repos/dapr/cli/releases?per_page=100" \
+          VERSIONS=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/dapr/cli/releases?per_page=100" \
             | jq -r '.[].tag_name' \
             | sed 's/^v//')
           VERSION=$(echo "$VERSIONS" \
@@ -51,7 +68,37 @@ runs:
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Install Dapr CLI
+      if: inputs.commit == ''
       shell: bash
       run: |
         wget -q https://raw.githubusercontent.com/dapr/cli/master/install/install.sh -O - \
-          | /bin/bash -s ${{ steps.version.outputs.version }}
+          | /bin/bash -s ${{ steps.resolve-version.outputs.version }}
+
+    - name: Check if Go is available
+      id: check-go
+      if: inputs.commit != ''
+      shell: bash
+      run: |
+        if command -v go &>/dev/null; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up Go
+      if: inputs.commit != '' && steps.check-go.outputs.available == 'false'
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+
+    - name: Build Dapr CLI from commit
+      if: inputs.commit != ''
+      shell: bash
+      run: |
+        TMPDIR=$(mktemp -d)
+        git clone --filter=blob:none https://github.com/dapr/cli.git "$TMPDIR/cli"
+        cd "$TMPDIR/cli"
+        git checkout "${{ inputs.commit }}"
+        GOOS=linux GOARCH=amd64 make
+        sudo cp dist/linux_amd64/release/dapr /usr/local/bin/dapr
+        dapr --version

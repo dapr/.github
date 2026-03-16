@@ -59,11 +59,14 @@ jobs:
       - uses: dapr/.github/.github/actions/setup-dapr-cli@main
         # with:
         #   version: '1.14.0'   # omit to use latest stable
+        #   commit: ''           # dapr/cli commit SHA or ref; builds from source, overrides version
 ```
 
 ### Setup Dapr Runtime ([`setup-dapr-runtime`](.github/actions/setup-dapr-runtime/action.yaml))
 
 Initialises the Dapr runtime via `dapr init`. Requires the Dapr CLI to be installed first (use `setup-dapr-cli`). Defaults to the highest semver release.
+
+`version` and `commit` are complementary: `dapr init` always runs (using `version` to set up the runtime environment — Redis, Zipkin, placement service, etc.), and if `commit` is also set, the `daprd` binary is replaced with one built from that ref afterwards.
 
 ```yaml
 jobs:
@@ -74,7 +77,9 @@ jobs:
 
       - uses: dapr/.github/.github/actions/setup-dapr-runtime@main
         # with:
-        #   version: '1.14.0'   # omit to use latest stable
+        #   version: '1.14.0'   # version passed to "dapr init"; omit to use latest stable
+        #   commit: ''           # dapr/dapr commit SHA or ref; builds daprd from source and
+        #                        # replaces the binary after init (version still controls init)
 
       - run: dapr --version
 ```
