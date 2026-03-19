@@ -102,7 +102,7 @@ for base_branch in target_branches:
     fetch = run(['git', 'fetch', 'origin', base_branch], check=False)
     if fetch.returncode != 0:
         msg = (
-            f"@{pr_data['user']['login']} Backporting to `{base_branch}` failed because "
+            f"Backporting to `{base_branch}` failed because "
             f"the branch does not exist."
         )
         gh_pr.create_issue_comment(msg)
@@ -163,7 +163,16 @@ git push --force-with-lease origin {backport_branch}
             )
             print(f"Cherry-pick conflict on {base_branch}, created placeholder PR: {backport_pr.html_url}")
         except GithubException as e:
-            gh_pr.create_issue_comment(msg)
+            server  = os.environ.get('GITHUB_SERVER_URL', 'https://github.com')
+            repo    = os.environ.get('GITHUB_REPOSITORY', '')
+            run_id  = os.environ.get('GITHUB_RUN_ID', '')
+            run_url = f"{server}/{repo}/actions/runs/{run_id}" if run_id else None
+            run_ref = f" See the [action run]({run_url}) for details." if run_url else ""
+            fallback_msg = (
+                f"Backporting to `{base_branch}` failed due to merge conflicts,"
+                f" and the placeholder PR could not be created automatically.{run_ref}"
+            )
+            gh_pr.create_issue_comment(fallback_msg)
             print(f"Cherry-pick conflict on {base_branch}, failed to create PR ({e}), posted comment instead.")
         continue
 
