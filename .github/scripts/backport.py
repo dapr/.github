@@ -115,17 +115,19 @@ for base_branch in target_branches:
 
     if cherry.returncode != 0:
         run(['git', 'cherry-pick', '--abort'], check=False)
-        run(['git', 'checkout', '-'], check=False)
-        run(['git', 'branch', '-D', backport_branch], check=False)
 
         msg = f"""\
-@{pr_data['user']['login']} Backporting to `{base_branch}` failed due to merge conflicts. \
-Please backport manually:
+Backport of #{pr_number} to `{base_branch}`.
+
+Backporting failed due to merge conflicts. \
+Please resolve manually:
 
 ```bash
-# Create a new working tree
-git worktree add ../{backport_branch} {base_branch}
-cd ../{backport_branch}
+git fetch origin
+git checkout {backport_branch}
+
+# Reset to base, discarding the empty placeholder commit
+git reset --hard origin/{base_branch}
 
 # Cherry-pick the merged commit
 git cherry-pick -x -m 1 {merge_commit_sha}
@@ -133,13 +135,36 @@ git cherry-pick -x -m 1 {merge_commit_sha}
 # Resolve the conflicts, then:
 git add .
 git cherry-pick --continue
-git push origin {backport_branch}
-```
 
-Then open a pull request against `{base_branch}`.\
+# Force-push to replace the placeholder commit
+git push --force-with-lease origin {backport_branch}
+```\
 """
-        gh_pr.create_issue_comment(msg)
-        print(f"Cherry-pick conflict on {base_branch}, posted comment.")
+        # Create an empty commit so the branch differs from base and a PR can be opened.
+        run(['git', 'commit', '--allow-empty', '-m',
+             f'chore: placeholder for backport #{pr_number} to {base_branch} (manual resolution required)'])
+        head_sha = run(['git', 'rev-parse', 'HEAD']).stdout.strip()
+        run(['git', 'push', 'origin', backport_branch])
+        run(['git', 'checkout', '-'], check=False)
+
+        # Mark the commit as failing so the PR cannot be accidentally merged.
+        gh_repo.get_commit(head_sha).create_status(
+            state='failure',
+            context='backport/conflict',
+            description='Manual conflict resolution required — do not merge.',
+        )
+
+        try:
+            backport_pr = gh_repo.create_pull(
+                title=backport_title,
+                body=msg,
+                head=backport_branch,
+                base=base_branch,
+            )
+            print(f"Cherry-pick conflict on {base_branch}, created placeholder PR: {backport_pr.html_url}")
+        except GithubException as e:
+            gh_pr.create_issue_comment(msg)
+            print(f"Cherry-pick conflict on {base_branch}, failed to create PR ({e}), posted comment instead.")
         continue
 
     run(['git', 'push', 'origin', backport_branch])
