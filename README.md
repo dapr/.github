@@ -15,6 +15,8 @@ on:
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   automerge:
     uses: dapr/.github/.github/workflows/automerge.yaml@main
@@ -34,6 +36,8 @@ on:
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:
+
+permissions: {}
 
 jobs:
   prune_stale:
@@ -95,6 +99,8 @@ on:
     types:
       - closed
       - labeled
+
+permissions: {}
 
 jobs:
   backport:

@@ -14,7 +14,8 @@
 # Reusable workflow for pruning stale issues and PRs.
 # By default, issues and PRs with no activity for 90 days are marked stale, and
 # closed after a further 7 days unless labelled pinned, good first issue, help
-# wanted, or triaged/resolved. All thresholds are configurable via inputs.
+# wanted, or triaged/resolved. Thresholds, labels, and operations-per-run are
+# all configurable via inputs.
 
 name: Prune stale issues and PRs
 
@@ -37,6 +38,26 @@ on:
         type: number
         default: 7
         description: Days after stale label before an issue is closed
+      stale-issue-label:
+        type: string
+        default: 'stale'
+        description: Label to apply when marking an issue as stale
+      stale-pr-label:
+        type: string
+        default: 'stale'
+        description: Label to apply when marking a PR as stale
+      exempt-issue-labels:
+        type: string
+        default: 'pinned,good first issue,help wanted,triaged/resolved'
+        description: Comma-separated list of labels that exempt an issue from being marked stale
+      exempt-pr-labels:
+        type: string
+        default: 'pinned'
+        description: Comma-separated list of labels that exempt a PR from being marked stale
+      operations-per-run:
+        type: number
+        default: 500
+        description: Maximum number of operations per run
     secrets:
       dapr_bot_token:
         required: true
@@ -47,10 +68,6 @@ jobs:
   prune_stale:
     name: Prune stale
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
     steps:
       - name: Prune stale
         uses: actions/stale@v9
@@ -83,9 +100,9 @@ jobs:
             no further activity for ${{ inputs.days-before-pr-close }} days. Please feel free
             to give a status update now, ping for review, or re-open when it's ready.
             Thank you for your contributions!
-          stale-issue-label: 'stale'
-          exempt-issue-labels: 'pinned,good first issue,help wanted,triaged/resolved'
-          stale-pr-label: 'stale'
-          exempt-pr-labels: 'pinned'
-          operations-per-run: 500
+          stale-issue-label: ${{ inputs.stale-issue-label }}
+          exempt-issue-labels: ${{ inputs.exempt-issue-labels }}
+          stale-pr-label: ${{ inputs.stale-pr-label }}
+          exempt-pr-labels: ${{ inputs.exempt-pr-labels }}
+          operations-per-run: ${{ inputs.operations-per-run }}
           ascending: true
