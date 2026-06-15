@@ -24,6 +24,11 @@ import sys
 
 from github import Auth, Github, GithubException
 
+# In CI stdout is a pipe and therefore block-buffered; switch to line
+# buffering so logs stream in real time and stay correctly ordered with
+# stderr (e.g. command output and tracebacks on failure).
+sys.stdout.reconfigure(line_buffering=True)
+
 
 def run(cmd, check=True):
     print(f"+ {' '.join(cmd)}")
