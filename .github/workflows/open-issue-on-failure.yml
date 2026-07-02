@@ -77,9 +77,10 @@ jobs:
             const { TITLE, EXTRA_BODY, LABELS, MENTION, RUN_URL, WORKFLOW, REF, SHA } = process.env;
             const { owner, repo } = context.repo;
             const labels = LABELS.split(',').map(l => l.trim()).filter(Boolean);
-            // Marker keyed to workflow + ref (not the title text), so re-runs of
-            // the same release re-find the issue even if the title wording changes.
-            const marker = `<!-- open-issue-on-failure:${WORKFLOW}:${REF} -->`;
+            // Hidden marker so re-runs re-find this issue even if a maintainer
+            // manually renames it. TITLE already encodes the workflow + release
+            // tag (callers resolve the tag), giving one issue per release.
+            const marker = `<!-- open-issue-on-failure:${TITLE} -->`;
 
             // Reusable workflows share the caller's run_id, so this lists every
             // job in the release run. Used to build the failed-job links.
