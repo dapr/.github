@@ -77,12 +77,13 @@ jobs:
             const { TITLE, EXTRA_BODY, LABELS, MENTION, RUN_URL, WORKFLOW, REF, SHA } = process.env;
             const { owner, repo } = context.repo;
             const labels = LABELS.split(',').map(l => l.trim()).filter(Boolean);
-            // Stable marker so we can re-find this issue even if the title changes.
-            const marker = `<!-- open-issue-on-failure:${TITLE} -->`;
+            // Marker keyed to workflow + ref (not the title text), so re-runs of
+            // the same release re-find the issue even if the title wording changes.
+            const marker = `<!-- open-issue-on-failure:${WORKFLOW}:${REF} -->`;
 
             // Reusable workflows share the caller's run_id, so this lists every
-            // job in the release run. Drives both the failed-job links and the
-            // "already retried" note. Empty on error (needs actions: read).
+            // job in the release run. Used to build the failed-job links.
+            // Empty on error (needs actions: read).
             let failed = [];
             try {
               const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
@@ -93,7 +94,7 @@ jobs:
               core.warning(`Could not list failed jobs (needs actions: read): ${e.message}`);
             }
             const failedJobs = failed.length
-              ? ['', '**Failed jobs:**', ...failed.map(j => `- [${j.name}](${j.html_url})`)].join('\n')
+              ? ['**Failed jobs:**', ...failed.map(j => `- [${j.name}](${j.html_url})`)].join('\n')
               : '';
 
             const runContext = [
@@ -102,23 +103,23 @@ jobs:
               `- **Commit:** \`${SHA}\``,
             ].join('\n');
 
+            // Each entry is a section; blank lines between them come from the
+            // \n\n join, and empty sections drop out.
             const issueBody = [
               MENTION.trim(),
               `A release/publish job failed in **${WORKFLOW}**.`,
-              '',
               runContext,
               failedJobs,
-              EXTRA_BODY.trim() && `\n${EXTRA_BODY.trim()}`,
-              '',
+              EXTRA_BODY.trim(),
               marker,
-            ].filter(Boolean).join('\n');
+            ].filter(Boolean).join('\n\n');
 
-            // Dedup: find an existing open issue with the same title (or marker).
+            // Dedup: scan all open issues (not filtered by label, so a relabelled
+            // issue still matches) for the same marker or title.
             const open = await github.paginate(github.rest.issues.listForRepo, {
               owner,
               repo,
               state: 'open',
-              labels: labels.join(',') || undefined,
               per_page: 100,
             });
             const match = open.find(i =>
@@ -131,10 +132,9 @@ jobs:
                 issue_number: match.number,
                 body: [
                   'The release/publish job failed again.',
-                  '',
                   runContext,
                   failedJobs,
-                ].filter(Boolean).join('\n'),
+                ].filter(Boolean).join('\n\n'),
               });
               core.notice(`Commented on existing issue #${match.number}`);
               return;
