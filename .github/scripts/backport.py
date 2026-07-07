@@ -22,12 +22,28 @@ import re
 import subprocess
 import sys
 
-from github import Github, GithubException
+from github import Auth, Github, GithubException
+
+# In CI stdout is a pipe and therefore block-buffered; switch to line
+# buffering so logs stream in real time and stay correctly ordered with
+# stderr (e.g. command output and tracebacks on failure).
+sys.stdout.reconfigure(line_buffering=True)
 
 
 def run(cmd, check=True):
     print(f"+ {' '.join(cmd)}")
-    return subprocess.run(cmd, check=check, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    # Always surface the command output so failures (e.g. git push) are
+    # visible in the logs rather than hidden behind a bare exit code.
+    if result.stdout:
+        print(result.stdout, end='' if result.stdout.endswith('\n') else '\n')
+    if result.stderr:
+        print(result.stderr, end='' if result.stderr.endswith('\n') else '\n',
+              file=sys.stderr)
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode, cmd, output=result.stdout, stderr=result.stderr)
+    return result
 
 
 # Templates — configurable via environment variables.
@@ -77,7 +93,7 @@ if not target_branches:
     print("No backport labels found, skipping.")
     sys.exit(0)
 
-g = Github(os.environ['GITHUB_TOKEN'])
+g = Github(auth=Auth.Token(os.environ['GITHUB_TOKEN']))
 gh_repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
 gh_pr = gh_repo.get_pull(pr_number)
 

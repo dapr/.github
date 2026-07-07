@@ -15,10 +15,10 @@
 
 import os
 
-from github import Github
+from github import Auth, Github
 
 
-g = Github(os.getenv("GITHUB_TOKEN"))
+g = Github(auth=Auth.Token(os.getenv("GITHUB_TOKEN")))
 repo = g.get_repo(os.getenv("GITHUB_REPOSITORY"))
 org = g.get_organization(repo.owner.login)
 maintainers = set()
