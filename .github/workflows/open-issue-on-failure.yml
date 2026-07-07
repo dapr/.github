@@ -1,0 +1,151 @@
+#
+# Copyright 2026 The Dapr Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Reusable workflow that opens (or comments on) a tracking issue when a
+# release/publish job fails. Call it from a job gated with `if: failure()`
+# in the workflow that runs the release. The issue is opened in the calling
+# repository (context.repo). To avoid duplicates, if an open issue with the
+# same title already exists, a comment is added to it instead of opening a
+# new one.
+
+name: Open issue on failure
+
+on:
+  workflow_call:
+    inputs:
+      title:
+        required: true
+        type: string
+        description: Title of the issue to open.
+      body:
+        required: false
+        type: string
+        default: ''
+        description: Extra context appended to the generated issue body.
+      labels:
+        required: false
+        type: string
+        default: ''
+        description: Comma-separated list of labels to apply to the issue.
+      mention:
+        required: false
+        type: string
+        default: ''
+        description: >
+          Space-separated @-handles or teams to mention in the issue body,
+          e.g. "@dapr/maintainers-dapr @dapr/approvers-dapr".
+    secrets:
+      dapr_bot_token:
+        required: false
+        description: >
+          Token used to author the issue. When omitted, the built-in
+          GITHUB_TOKEN is used (needs issues: write on the calling job).
+
+permissions: {}
+
+jobs:
+  open-issue:
+    name: Open issue on failure
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read # to list the run's failed jobs and link to them
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          TITLE: ${{ inputs.title }}
+          EXTRA_BODY: ${{ inputs.body }}
+          LABELS: ${{ inputs.labels }}
+          MENTION: ${{ inputs.mention }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        with:
+          github-token: ${{ secrets.dapr_bot_token || github.token }}
+          script: |
+            const { TITLE, EXTRA_BODY, LABELS, MENTION, RUN_URL, WORKFLOW, REF, SHA } = process.env;
+            const { owner, repo } = context.repo;
+            const labels = LABELS.split(',').map(l => l.trim()).filter(Boolean);
+            // Hidden marker so re-runs re-find this issue even if a maintainer
+            // manually renames it. TITLE already encodes the workflow + release
+            // tag (callers resolve the tag), giving one issue per release.
+            const marker = `<!-- open-issue-on-failure:${TITLE} -->`;
+
+            // Reusable workflows share the caller's run_id, so this lists every
+            // job in the release run. Used to build the failed-job links.
+            // Empty on error (needs actions: read).
+            let failed = [];
+            try {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner, repo, run_id: context.runId, per_page: 100,
+              });
+              failed = jobs.filter(j => ['failure', 'cancelled', 'timed_out'].includes(j.conclusion));
+            } catch (e) {
+              core.warning(`Could not list failed jobs (needs actions: read): ${e.message}`);
+            }
+            const failedJobs = failed.length
+              ? ['**Failed jobs:**', ...failed.map(j => `- [${j.name}](${j.html_url})`)].join('\n')
+              : '';
+
+            const runContext = [
+              `- **Workflow run:** ${RUN_URL}`,
+              `- **Ref:** \`${REF}\``,
+              `- **Commit:** \`${SHA}\``,
+            ].join('\n');
+
+            // Each entry is a section; blank lines between them come from the
+            // \n\n join, and empty sections drop out.
+            const issueBody = [
+              MENTION.trim(),
+              `A release/publish job failed in **${WORKFLOW}**.`,
+              runContext,
+              failedJobs,
+              EXTRA_BODY.trim(),
+              marker,
+            ].filter(Boolean).join('\n\n');
+
+            // Dedup: scan all open issues (not filtered by label, so a relabelled
+            // issue still matches) for the same marker or title.
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const match = open.find(i =>
+              !i.pull_request && (i.title === TITLE || (i.body || '').includes(marker)));
+
+            if (match) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: match.number,
+                body: [
+                  'The release/publish job failed again.',
+                  runContext,
+                  failedJobs,
+                ].filter(Boolean).join('\n\n'),
+              });
+              core.notice(`Commented on existing issue #${match.number}`);
+              return;
+            }
+
+            const created = await github.rest.issues.create({
+              owner,
+              repo,
+              title: TITLE,
+              body: issueBody,
+              labels,
+            });
+            core.notice(`Opened issue #${created.data.number}`);
