@@ -18,6 +18,9 @@ import os
 from github import Auth, Github
 
 
+# If true, enqueue approved PRs via auto-merge (merge queue) instead of merging directly.
+merge_via_queue = os.getenv("MERGE_VIA_QUEUE", "false").lower() == "true"
+
 g = Github(auth=Auth.Token(os.getenv("GITHUB_TOKEN")))
 repo = g.get_repo(os.getenv("GITHUB_REPOSITORY"))
 org = g.get_organization(repo.owner.login)
@@ -44,7 +47,10 @@ for pr in pulls:
         # Merge only one PR per run.
         print(f"Merging PR {pr.html_url}")
         try:
-            pr.merge(merge_method='squash')
+            if merge_via_queue:
+                pr.enable_automerge(merge_method='SQUASH')
+            else:
+                pr.merge(merge_method='squash')
             merged = True
             break
         except:
