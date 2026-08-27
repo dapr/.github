@@ -14,6 +14,10 @@
 # Reusable workflow for automerging and autoupdating PRs.
 # PRs labelled "automerge" that have been approved by a maintainer and are in
 # a clean state will be squash-merged (one per run).
+# With merge-via-queue: true, GitHub auto-merge ("merge when ready") is
+# enabled on the PR instead of merging directly, so it goes through the merge
+# queue if the base branch uses one. The repository must have "Allow
+# auto-merge" enabled in its settings for this to work.
 # PRs labelled "automerge" or "autoupdate" that are behind the base branch
 # will have their branch updated.
 
@@ -26,6 +30,11 @@ on:
         description: 'Comma-separated list of GitHub team slugs whose members can approve automerge'
         required: true
         type: string
+      merge-via-queue:
+        description: 'If true, enqueue approved PRs via auto-merge (merge queue) instead of merging directly'
+        required: false
+        type: boolean
+        default: false
     secrets:
       dapr_bot_token:
         required: true
@@ -48,5 +57,6 @@ jobs:
       - name: Automerge and autoupdate
         env:
           MAINTAINER_TEAMS: ${{ inputs.maintainer-teams }}
+          MERGE_VIA_QUEUE: ${{ inputs.merge-via-queue }}
           GITHUB_TOKEN: ${{ secrets.dapr_bot_token }}
         run: python dapr-github/.github/scripts/automerge.py

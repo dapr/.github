@@ -8,6 +8,8 @@ Shared GitHub Actions workflows for the [dapr](https://github.com/dapr) organisa
 
 Squash-merges PRs labelled `automerge` that have been approved by a maintainer. Also updates branches of PRs labelled `automerge` or `autoupdate` that have fallen behind their base branch.
 
+With `merge-via-queue: true`, instead of merging directly the workflow enables GitHub auto-merge ("merge when ready") on the PR, so it is merged by GitHub as soon as all requirements pass — including going through the merge queue if the base branch uses one. Use this on repositories where the base branch requires a merge queue, since GitHub rejects direct API merges there. Requires **"Allow auto-merge"** to be enabled in the repository settings (Settings → General → Pull Requests), otherwise enabling auto-merge fails and the PR is not merged.
+
 ```yaml
 # .github/workflows/dapr-bot-schedule.yml
 on:
@@ -22,6 +24,7 @@ jobs:
     uses: dapr/.github/.github/workflows/automerge.yaml@main
     with:
       maintainer-teams: maintainers,co-maintainers
+      # merge-via-queue: true   # default: false; enqueue via auto-merge instead of merging directly
     secrets:
       dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
 ```
