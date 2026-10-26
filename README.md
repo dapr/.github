@@ -111,3 +111,20 @@ jobs:
     secrets:
       dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
 ```
+
+To approve clean backport PRs and merge them once required checks pass, set
+`automerge: true` and grant the job `pull-requests: write`. The repository must
+allow GitHub Actions to approve pull requests and allow auto-merge. Conflict
+backports are never approved.
+
+```yaml
+jobs:
+  backport:
+    uses: dapr/.github/.github/workflows/backport.yaml@main
+    permissions:
+      pull-requests: write
+    with:
+      automerge: true
+    secrets:
+      dapr_bot_token: ${{ secrets.DAPR_BOT_TOKEN }}
+```
