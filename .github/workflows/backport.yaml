@@ -45,11 +45,18 @@ on:
         required: false
         type: string
         default: '[]'
+      automerge:
+        description: 'If true, clean backport PRs are labelled "automerge", approved by github-actions[bot] and set to auto-merge (squash) once required checks pass. The calling job must grant "pull-requests: write", and the repository must allow GitHub Actions to approve pull requests and allow auto-merge.'
+        required: false
+        type: boolean
+        default: false
     secrets:
       dapr_bot_token:
         required: true
 
-permissions: {}
+# No workflow-level permissions: the backport job inherits the caller's
+# GITHUB_TOKEN permissions, which only need "pull-requests: write" when
+# automerge is enabled.
 
 jobs:
   backport:
@@ -88,11 +95,14 @@ jobs:
           BACKPORT_TITLE_TEMPLATE: ${{ inputs.title-template }}
           BACKPORT_BODY_TEMPLATE: ${{ inputs.body-template }}
           BACKPORT_LABELS_TEMPLATE: ${{ inputs.labels-template }}
+          BACKPORT_AUTOMERGE: ${{ inputs.automerge }}
+          BACKPORT_APPROVE_TOKEN: ${{ github.token }}
         run: python dapr-github/.github/scripts/backport.py
 
   delete-branch:
     name: Delete backport branch
     runs-on: ubuntu-latest
+    permissions: {}
     if: >
       github.event.action == 'closed'
       && startsWith(github.event.pull_request.head.ref, 'backport-')

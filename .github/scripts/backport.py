@@ -54,6 +54,8 @@ title_template   = os.environ.get('BACKPORT_TITLE_TEMPLATE',   '[Backport {base}
 body_template    = os.environ.get('BACKPORT_BODY_TEMPLATE',    'Backport {merge_commit_sha} from #{number}.')
 # labels_template renders to a JSON array of strings; available vars: base, labels (JSON array).
 labels_template  = os.environ.get('BACKPORT_LABELS_TEMPLATE',  '[]')
+# If true, clean backport PRs are approved and set to auto-merge.
+automerge = os.environ.get('BACKPORT_AUTOMERGE', 'false').lower() == 'true'
 
 with open(os.environ['GITHUB_EVENT_PATH']) as f:
     event = json.load(f)
@@ -96,6 +98,9 @@ if not target_branches:
 g = Github(auth=Auth.Token(os.environ['GITHUB_TOKEN']))
 gh_repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
 gh_pr = gh_repo.get_pull(pr_number)
+# dapr-bot cannot approve the PRs it opens, so approve with the workflow's
+# GITHUB_TOKEN (github-actions[bot]) instead.
+approver_repo = Github(auth=Auth.Token(os.environ['BACKPORT_APPROVE_TOKEN'])).get_repo(gh_repo.full_name) if automerge else None
 
 for base_branch in target_branches:
     template_vars = {
@@ -111,6 +116,9 @@ for base_branch in target_branches:
     backport_title   = title_template.format_map(template_vars)
     backport_body    = body_template.format_map(template_vars)
     backport_labels  = json.loads(labels_template.format_map(template_vars))
+    if automerge:
+        # Lets automerge.py update the branch when it falls behind the base.
+        backport_labels.append('automerge')
 
     print(f"\nBackporting #{pr_number} to {base_branch} ...")
 
@@ -192,6 +200,7 @@ git push --force-with-lease origin {backport_branch}
             print(f"Cherry-pick conflict on {base_branch}, failed to create PR ({e}), posted comment instead.")
         continue
 
+    head_sha = run(['git', 'rev-parse', 'HEAD']).stdout.strip()
     run(['git', 'push', 'origin', backport_branch])
 
     try:
@@ -204,6 +213,12 @@ git push --force-with-lease origin {backport_branch}
         if backport_labels:
             gh_repo.get_issue(backport_pr.number).add_to_labels(*backport_labels)
         print(f"Created backport PR: {backport_pr.html_url}")
+        if automerge:
+            # Approve the exact commit pushed above, so anything pushed since is not approved.
+            approver_repo.get_pull(backport_pr.number).create_review(
+                commit=approver_repo.get_commit(head_sha), event='APPROVE')
+            backport_pr.enable_automerge(merge_method='SQUASH')
+            print(f"Approved and enabled auto-merge on {backport_pr.html_url}")
     except GithubException as e:
         print(f"Failed to create PR for {base_branch}: {e}")
 
