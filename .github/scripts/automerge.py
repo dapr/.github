@@ -31,8 +31,9 @@ for team_slug in os.getenv("MAINTAINER_TEAMS").split(','):
 
 def fetch_pulls(mergeable_state, labels = {'automerge'}):
     return [pr for pr in repo.get_pulls(state='open', sort='created') \
-        if (not pr.draft) and pr.mergeable_state == mergeable_state and \
-            (not labels or len(labels.intersection({l.name for l in pr.labels})) > 0)]
+        if (not pr.draft) and \
+            (not labels or len(labels.intersection({l.name for l in pr.labels})) > 0) and \
+            pr.mergeable_state == mergeable_state]
 
 def is_approved(pr):
     approvers = [r.user.login for r in pr.get_reviews() if r.state == 'APPROVED' and r.user.login in maintainers]
